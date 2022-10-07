@@ -6,6 +6,8 @@ import os, imageio
 ##########  see https://github.com/Fyusion/LLFF for original
 
 def _minify(basedir, factors=[], resolutions=[]):
+    # 这个函数主要负责创建目标分辨率的数据集
+    # 判断是否需要加载，如果不存在对应下采样或者分辨率的文件夹就需要加载
     needtoload = False
     for r in factors:
         imgdir = os.path.join(basedir, 'images_{}'.format(r))
@@ -47,7 +49,7 @@ def _minify(basedir, factors=[], resolutions=[]):
         ext = imgs[0].split('.')[-1]
         args = ' '.join(['mogrify', '-resize', resizearg, '-format', 'png', '*.{}'.format(ext)])
         print(args)
-        os.chdir(imgdir)
+        os.chdir(imgdir)    # 修改当前工作目录
         check_output(args, shell=True)
         os.chdir(wd)
         
@@ -60,13 +62,15 @@ def _minify(basedir, factors=[], resolutions=[]):
         
         
 def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
-    
+    # 读取npy文件 
     poses_arr = np.load(os.path.join(basedir, 'poses_bounds.npy'))
     poses = poses_arr[:, :-2].reshape([-1, 3, 5]).transpose([1,2,0])
     bds = poses_arr[:, -2:].transpose([1,0])
     
+    # 单张图片
     img0 = [os.path.join(basedir, 'images', f) for f in sorted(os.listdir(os.path.join(basedir, 'images'))) \
             if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
+    # 获取单张图片的shape
     sh = imageio.imread(img0).shape
     
     sfx = ''
@@ -111,6 +115,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         else:
             return imageio.imread(f)
         
+    # 读取所有图像数据并把值缩小到0-1之间
     imgs = imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
     
@@ -254,36 +259,42 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
     bds = np.moveaxis(bds, -1, 0).astype(np.float32)
     
     # Rescale if bd_factor is provided
+    # sc是进行边界缩放的比例
     sc = 1. if bd_factor is None else 1./(bds.min() * bd_factor)
+    # pose也就要对应缩放
     poses[:,:3,3] *= sc
     bds *= sc
     
     if recenter:
+        # 修改pose（shape=图像数,通道数,5）前四列的值，只有最后一列（高、宽、焦距）不变  
         poses = recenter_poses(poses)
         
     if spherify:
         poses, render_poses, bds = spherify_poses(poses, bds)
 
     else:
-        
+        # shape=(3,5)相当于汇集了所有图像
         c2w = poses_avg(poses)
         print('recentered', c2w.shape)
         print(c2w[:3,:4])
 
         ## Get spiral
         # Get average pose
+        # 3*1
         up = normalize(poses[:, :3, 1].sum(0))
 
         # Find a reasonable "focus depth" for this dataset
         close_depth, inf_depth = bds.min()*.9, bds.max()*5.
         dt = .75
         mean_dz = 1./(((1.-dt)/close_depth + dt/inf_depth))
-        focal = mean_dz
+        focal = mean_dz # 焦距
 
         # Get radii for spiral path
         shrink_factor = .8
         zdelta = close_depth * .2
+        # 获取所有poses的3列，shape(图片数,3)
         tt = poses[:,:3,3] # ptstocam(poses[:3,3,:].T, c2w).T
+        # 求90百分位的值
         rads = np.percentile(np.abs(tt), 90, 0)
         c2w_path = c2w
         N_views = 120
@@ -297,6 +308,7 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
             N_views/=2
 
         # Generate poses for spiral path
+        # 一个list，有120（由N_views决定）个元素，每个元素shape(3,5)
         render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
         
         
@@ -306,13 +318,15 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
     print('Data:')
     print(poses.shape, images.shape, bds.shape)
     
+    # shape 图片数
     dists = np.sum(np.square(c2w[:3,3] - poses[:,:3,3]), -1)
+    # 取到值最小的索引
     i_test = np.argmin(dists)
     print('HOLDOUT view is', i_test)
     
     images = images.astype(np.float32)
     poses = poses.astype(np.float32)
-
+    # images (图片数,高,宽,3通道), poses (图片数,3通道,5) ,bds (图片数,2) render_poses(N_views,图片数,5)，i_test为一个索引数字
     return images, poses, bds, render_poses, i_test
 
 

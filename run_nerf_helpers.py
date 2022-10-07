@@ -70,13 +70,16 @@ def get_embedder(multires, i=0):
 
 # Model
 class NeRF(nn.Module):
+    # 这个类用于创建model，alpha输出的是密度，rgb是颜色，一个batch是1024个光束，也就是一个光束采样64个点
     def __init__(self, D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
         """ 
         """
         super(NeRF, self).__init__()
         self.D = D
         self.W = W
+        # 输入的通道
         self.input_ch = input_ch
+        # 输入的视角
         self.input_ch_views = input_ch_views
         self.skips = skips
         self.use_viewdirs = use_viewdirs
@@ -170,12 +173,15 @@ def get_rays(H, W, K, c2w):
 def get_rays_np(H, W, K, c2w):  # 此函数原理有图解 https://blog.csdn.net/qq_41071191/article/details/125613474 
     # np.meshgrid(a, b,indexing = "xy") 函数会返回 b.shape() 行 ,a.shape() 列的二维数组。因此 i, j 都是 [H, W] 的二维数组。
     # i 的每一行代表 x 轴坐标,j 的每一行代表 y 轴坐标。如此一来我们得到了一个图片的每个像素点的笛卡尔坐标。
+    # 生成网格点坐标矩阵，i和j分别表示每个像素的坐标
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
     # 我们利用相机内参 K 计算每个像素坐标相对于光心的单位方向：
     dirs = np.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -np.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
+    # 将光线方向从相机旋转到世界
     rays_d = np.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
+    # 将相机框架的原点转换为世界框架，它是所有光线的起源
     rays_o = np.broadcast_to(c2w[:3,-1], np.shape(rays_d))
     # 至此我们生成了每个方向下的像素点到光心的单位方向(Z 轴为 1)。
     # 我们有了这个单位方向就可以通过调整 Z 轴坐标生成空间中每一个点坐标，借此模拟一条光线。
@@ -183,6 +189,7 @@ def get_rays_np(H, W, K, c2w):  # 此函数原理有图解 https://blog.csdn.net
 
 
 def ndc_rays(H, W, focal, near, rays_o, rays_d):
+    # 把光线的原点移动到near平面
     # Shift ray origins to near plane
     t = -(near + rays_o[...,2]) / rays_d[...,2]
     rays_o = rays_o + t[...,None] * rays_d
