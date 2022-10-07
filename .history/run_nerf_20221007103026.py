@@ -850,11 +850,11 @@ def train():
             loss = loss + img_loss0
             psnr0 = mse2psnr(img_loss0)
 
-        loss.backward() # 损失反向传播
+        loss.backward()
         optimizer.step()
 
         # NOTE: IMPORTANT!
-        ###   update learning rate   ###    动态更新学习率
+        ###   update learning rate   ###
         decay_rate = 0.1
         decay_steps = args.lrate_decay * 1000
         new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))

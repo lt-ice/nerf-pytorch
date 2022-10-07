@@ -39,14 +39,13 @@ class Embedder:
             
         for freq in freq_bands:
             for p_fn in self.kwargs['periodic_fns']:
-                embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))   # sin(x * 2^n)  参考位置编码公式
-                out_dim += d     # 每使用子编码公式一次就要把输出维度加 3，因为每个待编码的位置维度是 3
+                embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
+                out_dim += d
                     
-        self.embed_fns = embed_fns  # 相当于是一个编码公式列表
+        self.embed_fns = embed_fns
         self.out_dim = out_dim
         
     def embed(self, inputs):
-        # 对各个输入进行编码，给定一个输入，使用编码列表中的公式分别对他编码
         return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
 
 
@@ -167,18 +166,13 @@ def get_rays(H, W, K, c2w):
     return rays_o, rays_d
 
 
-def get_rays_np(H, W, K, c2w):  # 此函数原理有图解 https://blog.csdn.net/qq_41071191/article/details/125613474 
-    # np.meshgrid(a, b,indexing = "xy") 函数会返回 b.shape() 行 ,a.shape() 列的二维数组。因此 i, j 都是 [H, W] 的二维数组。
-    # i 的每一行代表 x 轴坐标,j 的每一行代表 y 轴坐标。如此一来我们得到了一个图片的每个像素点的笛卡尔坐标。
+def get_rays_np(H, W, K, c2w):
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
-    # 我们利用相机内参 K 计算每个像素坐标相对于光心的单位方向：
     dirs = np.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -np.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
     rays_d = np.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
     rays_o = np.broadcast_to(c2w[:3,-1], np.shape(rays_d))
-    # 至此我们生成了每个方向下的像素点到光心的单位方向(Z 轴为 1)。
-    # 我们有了这个单位方向就可以通过调整 Z 轴坐标生成空间中每一个点坐标，借此模拟一条光线。
     return rays_o, rays_d
 
 

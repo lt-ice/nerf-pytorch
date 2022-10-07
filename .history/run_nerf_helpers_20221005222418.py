@@ -167,9 +167,9 @@ def get_rays(H, W, K, c2w):
     return rays_o, rays_d
 
 
-def get_rays_np(H, W, K, c2w):  # 此函数原理有图解 https://blog.csdn.net/qq_41071191/article/details/125613474 
+def get_rays_np(H, W, K, c2w):
     # np.meshgrid(a, b,indexing = "xy") 函数会返回 b.shape() 行 ,a.shape() 列的二维数组。因此 i, j 都是 [H, W] 的二维数组。
-    # i 的每一行代表 x 轴坐标,j 的每一行代表 y 轴坐标。如此一来我们得到了一个图片的每个像素点的笛卡尔坐标。
+    # i 的每一行代表 x 轴坐标,j 的每一行代表 y 轴坐标。如此一来我们的到了一个图片的每个像素点的笛卡尔坐标。
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
     # 我们利用相机内参 K 计算每个像素坐标相对于光心的单位方向：
     dirs = np.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -np.ones_like(i)], -1)
@@ -177,8 +177,6 @@ def get_rays_np(H, W, K, c2w):  # 此函数原理有图解 https://blog.csdn.net
     rays_d = np.sum(dirs[..., np.newaxis, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
     rays_o = np.broadcast_to(c2w[:3,-1], np.shape(rays_d))
-    # 至此我们生成了每个方向下的像素点到光心的单位方向(Z 轴为 1)。
-    # 我们有了这个单位方向就可以通过调整 Z 轴坐标生成空间中每一个点坐标，借此模拟一条光线。
     return rays_o, rays_d
 
 

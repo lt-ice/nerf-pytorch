@@ -94,12 +94,8 @@ def load_blender_data(basedir, half_res=False, testskip=1):
             imgs_half_res[i] = cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
         imgs = imgs_half_res
         # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
-    '''
-    imgs : 根据 .json 文件加载到的所有图像数据。(N,H,W,4)N 代表用于 train、test、val 的总数量
-    poses : 转置矩阵。(N,4,4)
-    render_poses : 用于测试的 pose 。(40,4,4)
-    i_split : [[0:train], [train:val], [val:test]]
-    '''    
+
+        
     return imgs, poses, render_poses, [H, W, focal], i_split
 
 

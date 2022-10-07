@@ -61,29 +61,26 @@ def load_blender_data(basedir, half_res=False, testskip=1):
             skip = testskip
             
         for frame in meta['frames'][::skip]:
-            # 以指定步长读取列表中的字典
             fname = os.path.join(basedir, frame['file_path'] + '.png')
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame['transform_matrix']))
-        imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA) # 此时 图像数组是一个 [n, H, W, 4] 的数组
-        poses = np.array(poses).astype(np.float32)  # [n, 4, 4]
-        counts.append(counts[-1] + imgs.shape[0])   # 用于标定到train、test、val
-        all_imgs.append(imgs)   # 包含了 train、test、val 的图像的列表
+        imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)
+        poses = np.array(poses).astype(np.float32)
+        counts.append(counts[-1] + imgs.shape[0])
+        all_imgs.append(imgs)
         all_poses.append(poses)
     
     i_split = [np.arange(counts[i], counts[i+1]) for i in range(3)]
     
-    imgs = np.concatenate(all_imgs, 0)  # 把列表聚合称为一个数组 [N, H, W, 4]
+    imgs = np.concatenate(all_imgs, 0)
     poses = np.concatenate(all_poses, 0)
     
     H, W = imgs[0].shape[:2]
     camera_angle_x = float(meta['camera_angle_x'])
-    focal = .5 * W / np.tan(.5 * camera_angle_x)    # 计算焦距
+    focal = .5 * W / np.tan(.5 * camera_angle_x)
     
-    # 制作用于测试训练效果的 渲染pose
     render_poses = torch.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]], 0)
     
-    # 为了节省内存开销可以选择只加载一半的数据，这里不再展开解释
     if half_res:
         H = H//2
         W = W//2
@@ -94,12 +91,8 @@ def load_blender_data(basedir, half_res=False, testskip=1):
             imgs_half_res[i] = cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
         imgs = imgs_half_res
         # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
-    '''
-    imgs : 根据 .json 文件加载到的所有图像数据。(N,H,W,4)N 代表用于 train、test、val 的总数量
-    poses : 转置矩阵。(N,4,4)
-    render_poses : 用于测试的 pose 。(40,4,4)
-    i_split : [[0:train], [train:val], [val:test]]
-    '''    
+
+        
     return imgs, poses, render_poses, [H, W, focal], i_split
 
 
